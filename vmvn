@@ -1,0 +1,136 @@
+#!/bin/sh
+# vmvn - mvnを使ってビルドを実行する
+
+# The MIT License (MIT)
+#
+# Copyright (c) 2015 yhirano-.
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files
+# (the "Software"), to deal in the Software without restriction,
+# including without limitation the rights to use, copy, modify, merge,
+# publish, distribute, sublicense, and/or sell copies of the Software,
+# and to permit persons to whom the Software is furnished to do so,
+# subject to the following conditions:
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+# ローカルリポジトリパス
+REPOSITORY=../repository
+
+########################################################################
+
+# ローカルリポジトリにjarファイルをインストールする
+function v_install() {
+	mvn install:install-file -Dfile=$JARFILE -DgroupId=$GID -DartifactId=$AID -Dversion=$VER -Dpackaging=jar -DgeneratePom=true -Dmaven.repo.local=$REPOSITORY
+}
+
+# mvnリポジトリの依存ファイルをローカルリポジトリにダウンロードする
+function v_pull() {
+	mvn dependency:go-offline -Dmaven.repo.local=$REPOSITORY
+	mvn package -DskipTests=true -Dmaven.repo.local=$REPOSITORY
+}
+
+# ローカルリポジトリをクリアする
+function v_clear() {
+	mvn dependency:purge-local-repository
+	mvn clean
+}
+
+# 全ビルドする（クリーン・ビルド・テスト）
+function v_package() {
+	mvn -o clean package -Dmaven.repo.local=$REPOSITORY
+}
+
+# ビルドする
+function v_make() {
+	mvn -o package -DskipTests=true -Dmaven.repo.local=$REPOSITORY
+}
+
+# ビルド・テストする
+function v_test() {
+	mvn -o package -Dmaven.repo.local=$REPOSITORY
+}
+
+# クリーンする
+function v_clean() {
+	mvn -o clean -Dmaven.repo.local=$REPOSITORY
+}
+
+########################################################################
+
+function usage() {
+	case `vlang` in
+	ja)
+		echo "Usage: vmvn command"
+		echo "install conf-file - ローカルリポジトリにjarファイルをインストールする"
+		echo "pull              - mvnリポジトリの依存ファイルをローカルリポジトリに"
+		echo "                    ダウンロードする"
+		echo "clear             - ローカルリポジトリをクリアする"
+		echo "package           - 全ビルドする（クリーン・ビルド・テスト）"
+		echo "make              - ビルドする"
+		echo "test              - ビルド・テストする"
+		echo "clean             - クリーンする"
+		;;
+	*)
+		echo "Usage: vmvn command"
+		;;
+	esac
+	echo ""
+	echo "Samples:"
+	echo "vmvn install pom-java-saml.conf"
+	echo "vmvn pull"
+	echo "vmvn clear"
+	echo "vmvn package"
+	echo "vmvn make"
+	echo "vmvn test"
+	echo "vmvn clean"
+	exit 1
+}
+
+COMMAND=$1
+
+case $COMMAND in
+install)
+	CONFFILE=$2
+	if [ "$CONFFILE" == "" ]; then
+		echo "Usage: vmvn install conf-file."
+		echo 'sample conf-file is:
+
+JARFILE=../java-saml/target/java-saml.jar
+GID=com.onelogin
+AID=java-saml
+VER=0.1
+'
+		exit 1
+	fi
+	. ./$CONFFILE
+	echo $JARFILE
+	;;
+pull)
+	;;
+clear)
+	;;
+package)
+	;;
+make)
+	;;
+test)
+	;;
+clean)
+	;;
+*)
+	usage
+	;;
+esac
+
+v_$COMMAND
+

@@ -1,0 +1,187 @@
+#!/bin/sh
+# vdocker - dockerを使った処理を実行する
+
+# The MIT License (MIT)
+#
+# Copyright (c) 2015 yhirano-.
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files
+# (the "Software"), to deal in the Software without restriction,
+# including without limitation the rights to use, copy, modify, merge,
+# publish, distribute, sublicense, and/or sell copies of the Software,
+# and to permit persons to whom the Software is furnished to do so,
+# subject to the following conditions:
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+########################################################################
+
+# dockerコンテナをtarパッケージにする
+function v_pack() {
+	CONTID=`docker ps | awk 'match($2, /'$NAME'/) { print $1 }'`
+	echo $CONTID
+	docker export $CONTID > $NAME.tar
+}
+
+# tarパッケージをdockerイメージに展開する
+function v_unpack() {
+	cat $PACKNAME | docker import - $IMAGENAME:unpacked
+}
+
+# dockerコンテナの履歴を削除してdockerイメージに戻す
+function v_shrink() {
+	CONTID=`docker ps | awk 'match($2, /'$NAME'/) { print $1 }'`
+	rm -f docker_shrink.tar
+	docker export $CONTID > docker_shrink.tar
+	cat docker_shrink.tar | docker import - $IMAGENAME:shrinked
+	rm -f docker_shrink.tar
+}
+
+# dockerイメージでechoを実行してdockerコンテナをつくる
+function v_doecho() {
+	# get latest image-id.
+	IMAGEID=`docker images | awk 'match($1, /'$NAME'/) && match($2, /latest/) { print $3 }'`
+	echo image: $IMAGEID
+
+	# get latest container-id.
+	CONTID=`docker ps | awk 'match($2, /'$NAME'/) { print $1 }'`
+
+	if [ "$CONTID" == "" ]; then
+		# dummy run container
+		echo STEP1: run container.
+		docker run -t -i $IMAGEID /bin/echo ""
+
+		# get latest container-id.
+		CONTID=`docker ps | awk 'match($2, /'$NAME'/) { print $1 }'`
+	fi
+	echo container: $CONTID
+	docker ps
+}
+
+# dockerコンテナのIDを取得する
+function v_status() {
+	# get latest container-id.
+	CONTID=`docker ps | awk 'match($NF, /'$CONTNAME'/) { print $1 }'`
+	echo $CONTID
+}
+
+# dockerコンテナのIPアドレスを取得する
+function v_ip() {
+	IP=`docker inspect -f \'{{.NetworkSettings.IPAddress}}\' consul`
+	echo $IP
+}
+
+# dockerコンテナに入る
+function v_sh() {
+	docker exec -it $CONTNAME bash
+}
+
+########################################################################
+
+function usage() {
+	case `vlang` in
+	ja)
+		echo "Usage: vdocker command"
+		echo "	pack image-name cont-name   - dockerコンテナをtarパッケージにする"
+		echo "	unpack pack-name image-name - tarパッケージをdockerイメージに展開する"
+		echo "	doecho image-name           - dockerイメージでechoを実行してdockerコン"
+		echo "	                              テナをつくる"
+		echo "	shrink image-name cont-name - dockerコンテナの履歴を削除してdockerイメ"
+		echo "	                              ージに戻す"
+		echo "	status cont-name            - dockerコンテナのIDを取得する"
+		echo "	ip cont-name                - dockerコンテナのIPアドレスを取得する"
+		echo "	sh cont-name                - dockerコンテナに入る"
+		;;
+	*)
+		echo "Usage: vdocker command"
+		;;
+	esac
+	echo ""
+	echo "Samples:"
+	echo "vdocker pack progrium/consul consul"
+	echo "vdocker unpack consul.tar progrium/consul"
+	echo "vdocker doecho progrium/consul"
+	echo "vdocker shrink progrium/consul consul"
+	echo "vdocker status consul"
+	echo "vdocker ip consul"
+	echo "vdocker sh consul"
+	exit 1
+}
+
+function tips() {
+	echo "dockerコンテナを削除する:"
+	echo "docker stop コンテナ名; docker rm コンテナ名"
+	echo ""
+	echo "dockerイメージを削除する:(dockerコンテナを削除した後で)"
+	echo "docker rm イメージ名"
+	exit 1
+}
+
+COMMAND=$1
+
+case $COMMAND in
+pack)
+	IMAGENAME=$2
+	CONTNAME=$3
+	if [ "$CONTNAME" == "" ]; then
+		usage
+	fi
+	;;
+unpack)
+	PACKNAME=$2
+	IMAGENAME=$3
+	if [ "$IMAGENAME" == "" ]; then
+		usage
+	fi
+	;;
+doecho)
+	IMAGENAME=$2
+	if [ "$IMAGENAME" == "" ]; then
+		usage
+	fi
+	;;
+shrink)
+	IMAGENAME=$2
+	CONTNAME=$3
+	if [ "$CONTNAME" == "" ]; then
+		usage
+	fi
+	;;
+status)
+	CONTNAME=$2
+	if [ "$CONTNAME" == "" ]; then
+		usage
+	fi
+	;;
+ip)
+	CONTNAME=$2
+	if [ "$CONTNAME" == "" ]; then
+		usage
+	fi
+	;;
+sh)
+	CONTNAME=$2
+	if [ "$CONTNAME" == "" ]; then
+		usage
+	fi
+	;;
+tips)
+	tips
+	;;
+*)
+	usage
+	;;
+esac
+
+NAME=`echo $IMAGENAME | sed 's|/|.|'`
+v_$COMMAND
+

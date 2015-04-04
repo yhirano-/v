@@ -1,0 +1,87 @@
+#!/bin/sh
+# vbox - vagrantを使った処理を実行する
+
+# The MIT License (MIT)
+#
+# Copyright (c) 2015 yhirano-.
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files
+# (the "Software"), to deal in the Software without restriction,
+# including without limitation the rights to use, copy, modify, merge,
+# publish, distribute, sublicense, and/or sell copies of the Software,
+# and to permit persons to whom the Software is furnished to do so,
+# subject to the following conditions:
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+########################################################################
+
+# BOXをインストールする
+#   BOXNAME=保存するBOX名
+#   BOXFILE=インストールするBOXファイル名
+function v_install() {
+	vagrant box add $BOXNAME $BOXFILE
+	vagrant init $BOXNAME
+	vagrant up
+	vagrant halt
+}
+
+# BOXファイルをつくる
+#    BOXFILE=作成するBOXファイル名
+function v_pack() {
+	vagrant halt
+	vagrant package --base `cat .vagrant/machines/default/virtualbox/id` --output $BOXFILE
+}
+
+########################################################################
+
+function usage() {
+	case `vlang` in
+	ja)
+		echo "Usage: vbox command"
+		echo "	install box-name box-file - BOXをインストールする"
+		echo "	pack box-file             - BOXファイルをつくる"
+		;;
+	*)
+		echo "Usage: vbox command"
+		;;
+	esac
+	echo ""
+	echo "Samples:"
+	echo "vbox install centos7 centos-7.x-64bit-puppet-3.x-vbox.4.3.14-1.box"
+	echo "vbox pack centos7docker.box"
+	exit 1
+}
+
+COMMAND=$1
+
+case $COMMAND in
+install)
+	BOXNAME=$2
+	BOXFILE=$3
+	if [ "$BOXFILE" == "" ]; then
+		usage
+	fi
+	;;
+pack)
+	BOXFILE=$2
+	if [ "$BOXFILE" == "" ]; then
+		usage
+	fi
+	;;
+*)
+	usage
+	;;
+esac
+
+v_$COMMAND
+

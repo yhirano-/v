@@ -1,0 +1,124 @@
+#!/bin/sh
+# vconsul - consulを使った処理を実行する
+
+# The MIT License (MIT)
+#
+# Copyright (c) 2015 yhirano-.
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files
+# (the "Software"), to deal in the Software without restriction,
+# including without limitation the rights to use, copy, modify, merge,
+# publish, distribute, sublicense, and/or sell copies of the Software,
+# and to permit persons to whom the Software is furnished to do so,
+# subject to the following conditions:
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+########################################################################
+
+# start consul
+function v_start() {
+	if [ "`vdocker status progrium/consul`" == "" ]; then
+		CMD="docker run -d -p 8400:8400 -p 8500:8500 -p 8600:53/udp -h node1 --name consul progrium/consul -server -bootstrap -ui-dir /ui"
+		echo $CMD
+		$CMD
+	else
+		echo consul is already running.
+	fi
+}
+
+CONSUL_REGISTER_FORM='{
+  "Datacenter": "dc1",
+  "Node": "NAME",
+  "Address": "IPADDRESS",
+  "Service": {
+    "ID": "NAME",
+    "Service": "NAME",
+    "Tags": [
+      "master",
+      "v1"
+    ],
+    "Port": PORT
+  },
+  "Check": {
+    "Node": "NAME",
+    "CheckID": "service:NAME",
+    "Name": "NAME health check",
+    "Notes": "Script based health check",
+    "Status": "passing",
+    "ServiceID": "NAME"
+  }
+}'
+
+# add consul client
+#   APPNAME
+#   APPIP
+#   APPPORT
+function v_client() {
+	BODY=`echo $CONSUL_REGISTER_FORM | sed "s/NAME/$APPNAME/g" | sed "s/IPADDRESS/$APPIP/g" | sed "s/PORT/$APPPORT/g"`
+	echo $BODY | curl -XPUT http://127.0.0.1:8500/v1/catalog/register -d @-
+}
+
+# run jetty and use consul
+#   APPNAME
+#   APPNO
+function v_jetty() {
+	CMD="docker run -d -p 720$APPNO:8080 -p 730$APPNO:8585 -v /opt/$APPNAME/release:/var/lib/jetty/webapps \
+		--link consul:consul --dns=`redocker ip consul` --dns-search=service.consul --name $APPNAME jetty:jre8"
+	echo $CMD
+	$CMD
+}
+
+########################################################################
+
+function usage() {
+	case `vlang` in
+	ja)
+		echo "Usage: vconsul command"
+		echo "	start                           - consul serverを開始する"
+		echo "	client app-name app-ip app-port - consulに登録する"
+		echo "	jetty app-name app-no           - consulを使ったjettyを開始する"
+		;;
+	*)
+		echo "Usage: vconsul command"
+		;;
+	esac
+	exit 1
+}
+
+COMMAND=$1
+
+case $COMMAND in
+start)
+	;;
+client)
+	APPNAME=$2
+	APPIP=$3
+	APPPORT=$4
+	if [ "$APPPORT" == "" ]; then
+		usage
+	fi
+	;;
+jetty)
+	APPNAME=$2
+	APPNO=$3
+	if [ "$APPNO" == "" ]; then
+		usage
+	fi
+	;;
+*)
+	usage
+	;;
+esac
+
+v_$COMMAND
+
